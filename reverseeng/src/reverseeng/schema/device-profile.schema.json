@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reverseeng.local/schema/device-profile/0.1.0",
+  "title": "Device Profile",
+  "description": "Read-only, non-destructive snapshot of a device's hardware and software layout. Produced by the collection agent and published over MQTT as a retained message.",
+  "type": "object",
+  "required": ["schema_version", "device_id", "collected_at", "collection", "errors"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "device_id": {
+      "description": "Stable identifier used in MQTT topics. Derived from the board serial, falling back to hostname.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "collected_at": { "type": "string", "format": "date-time" },
+    "collection": {
+      "type": "object",
+      "required": ["mode", "agent_version"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "description": "running = agent executes on the live device; offline = reading a powered-off device's storage (e.g. SD card mounted elsewhere).",
+          "enum": ["running", "offline"]
+        },
+        "agent_version": { "type": "string" },
+        "root": { "type": "string", "description": "Filesystem root the agent read from." },
+        "hostname": { "type": ["string", "null"] }
+      }
+    },
+    "board": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"], "description": "Hex revision code, e.g. d04170." },
+        "serial": { "type": ["string", "null"] },
+        "compatible": { "type": "array", "items": { "type": "string" } },
+        "memory_bytes": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "chipset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "soc": { "type": ["string", "null"], "description": "e.g. bcm2712" },
+        "cpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "arch": { "type": ["string", "null"] },
+            "cores": { "type": ["integer", "null"], "minimum": 0 },
+            "part": { "type": ["string", "null"], "description": "CPU part id from /proc/cpuinfo, e.g. 0xd0b (Cortex-A76)." }
+          }
+        },
+        "companion_chips": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "bus"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "bus": { "enum": ["pcie", "i2c", "usb", "spi", "other"] },
+              "address": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "bootloader": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": ["string", "null"] },
+        "config": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "release": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] },
+        "cmdline": { "type": ["string", "null"] },
+        "installed_releases": { "type": "array", "items": { "type": "string" } },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "size": { "type": "integer", "minimum": 0 },
+              "used_by": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "device_tree": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "model": { "type": ["string", "null"] },
+            "compatible": { "type": "array", "items": { "type": "string" } },
+            "overlays": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "partitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "size_bytes"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "size_bytes": { "type": "integer", "minimum": 0 },
+              "mountpoint": { "type": ["string", "null"] },
+              "fstype": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "buses": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "i2c": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["adapter"],
+            "additionalProperties": false,
+            "properties": {
+              "adapter": { "type": "string" },
+              "name": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "usb": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "vendor_id", "product_id"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "vendor_id": { "type": "string" },
+              "product_id": { "type": "string" },
+              "manufacturer": { "type": ["string", "null"] },
+              "product": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "pcie": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["address", "vendor_id", "device_id"],
+            "additionalProperties": false,
+            "properties": {
+              "address": { "type": "string" },
+              "vendor_id": { "type": "string" },
+              "device_id": { "type": "string" },
+              "class": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "pinout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "enum": ["pinctrl", "static", "none"], "description": "pinctrl = live read of pin state; static = header map only." },
+        "pins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["gpio"],
+            "additionalProperties": false,
+            "properties": {
+              "gpio": { "type": "integer", "minimum": 0 },
+              "header_pin": { "type": ["integer", "null"], "minimum": 1, "maximum": 40 },
+              "function": { "type": ["string", "null"] },
+              "mode": { "type": ["string", "null"], "description": "Raw mode string, e.g. ip, op, a0." },
+              "pull": { "type": ["string", "null"], "enum": ["up", "down", "none", null] },
+              "level": { "type": ["integer", "null"], "enum": [0, 1, null] }
+            }
+          }
+        }
+      }
+    },
+    "boot_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": ["string", "null"] },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["key", "value", "section"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "type": "string" },
+              "value": { "type": "string" },
+              "section": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "security": {
+      "description": "Diagnosis only. The agent never writes OTP/eFuse, never changes lock state and never bypasses a protection.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "secure_boot": {
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "enum": ["enabled", "disabled", "unknown"] },
+            "evidence": { "type": ["string", "null"] }
+          }
+        },
+        "lock_risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "severity", "irreversible", "message"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "severity": { "enum": ["info", "warning", "critical"] },
+              "irreversible": { "type": "boolean" },
+              "message": { "type": "string" },
+              "source": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "errors": {
+      "description": "Collectors that failed or were skipped. A partial profile is still valid.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["collector", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "collector": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
