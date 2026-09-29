@@ -15,6 +15,27 @@ python -m v8.train_sac_her_v8 --seed 0              # 학습 (시드 3개 이상
 python -m v8.evaluate --policy v8/runs/seed0/final_actor_v8.pth --seeds 0 1 2
 ```
 
+## RTX 4090 + i9-12th (Windows) 실행 절차
+
+ADR 002의 `.venv_310`(PyTorch 2.0 + DirectML)은 CUDA를 쓰지 못하므로 V8용 가상환경을 따로 만듭니다.
+Windows에서 `pip install torch`만 하면 CPU 빌드가 설치되니 CUDA 인덱스를 지정하세요.
+
+```powershell
+cd <저장소 루트>
+py -3.10 -m venv .venv_v8
+.\.venv_v8\Scripts\Activate.ps1
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install "mujoco>=3.1" "numpy<2" pytest
+python -c "import torch; print(torch.cuda.is_available())"   # True 여야 함
+python -m pytest tests/test_v8_smoke.py -q
+python -m v8.train_sac_her_v8 --seed 0 --workers 12          # 시드 0, 1, 2 각각 실행
+```
+
+- 장치: CUDA가 보이면 자동으로 GPU 학습기, 워커는 CPU NumPy 추론이라 GPU 메모리를 나눠 쓰지 않습니다.
+- 워커 수: 기본값은 `min(12, 논리코어-2)` = i9-12th(24스레드)에서 12. 병목은 학습기(UTD 0.5)라 더 늘려도 이득이 작습니다.
+- 반드시 저장소 루트에서 `python -m v8....` 형태로 실행하세요 (Windows spawn 방식 대응).
+- 결과: `v8/runs/seed<N>/` 에 `log.csv`, `config.json`, `v8_ckpt.pt`, `final_actor_v8.pth`.
+
 ## V7 → V8 변경점
 
 | 축 | V7 | V8 | 가이드 |
