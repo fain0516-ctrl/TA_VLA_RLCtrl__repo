@@ -2,8 +2,8 @@
 """Pico 2 자작 보드 펌웨어 (MicroPython): Pi 지령(UDP) -> STS3215 버스 + DS3225 PWM, 상태 회신.
 
 역할 분담 (사용자 설명): Pi 5 는 연산·통신만, 이 보드가 서보 구동 전부.
-  Pi --UDP 5556--> W5500 --SPI--> Pico 2 --UART 1 Mbps--> URT-2 --> STS3215 x6
-                                          --PWM 50 Hz-----------------> DS3225 x4
+  Pi --UDP 5556--> W5500 --SPI0--> Pico 2 --UART0 1 Mbps--> ADuM1201 --> URT-2 --> STS3215 x6
+                                           --PWM 50 Hz--> SN74HCT125N ---------------> DS3225 x4
   Pi <--UDP 5555-- (지령 1개당 상태 1개)
 필요한 MicroPython: network.WIZNET5K 가 들어 있는 빌드 (예: WIZnet W5500-EVB-Pico2 용 펌웨어).
 """
@@ -11,7 +11,7 @@ import socket
 import time
 
 import network
-from machine import PWM, SPI, UART, WDT, Pin
+from machine import PWM, SPI, UART, WDT, Pin, SoftSPI
 
 import config as C
 import link
@@ -20,7 +20,10 @@ import sts
 
 # ---------------------------------------------------------------- 하드웨어 초기화
 def net_up():
-    spi = SPI(C.W5500_SPI, C.SPI_BAUD, sck=Pin(C.W5500_SCK), mosi=Pin(C.W5500_MOSI), miso=Pin(C.W5500_MISO))
+    if C.SOFT_SPI:
+        spi = SoftSPI(baudrate=2_000_000, sck=Pin(C.W5500_SCK), mosi=Pin(C.W5500_MOSI), miso=Pin(C.W5500_MISO))
+    else:
+        spi = SPI(C.W5500_SPI, C.SPI_BAUD, sck=Pin(C.W5500_SCK), mosi=Pin(C.W5500_MOSI), miso=Pin(C.W5500_MISO))
     nic = network.WIZNET5K(spi, Pin(C.W5500_CS), Pin(C.W5500_RST))
     nic.active(True)
     nic.ifconfig((C.PICO_IP, C.NETMASK, C.GATEWAY, C.DNS))
