@@ -17,15 +17,17 @@ flowchart LR
     subgraph T3["3조 Motion Control (이 워크스페이스)"]
         M["/motion_mapping_node"]
         C["/low_level_controller_node<br/>100 Hz"]
-        B["/servo_bus_node<br/>sim | hardware"]
+        B["/servo_bus_node<br/>sim | pico | hardware"]
     end
-    HW["STS3215 x6 (시리얼 버스)<br/>DS3225 x4 (PCA9685)"]
+    PICO["SN74125N + Pico 2 자작 보드<br/>(W5500 이더넷)"]
+    HW["STS3215 x6 (반이중 UART)<br/>DS3225 x4 (PWM)"]
 
     P -- "/hand_perception/joint_angles<br/>JointState" --> M
     M -- "/control/target_joint_positions [10]" --> C
     F -- "/tactile/normal_forces [5]<br/>/tactile/slip_detected [5]" --> C
     C -- "/control/actuator_commands [11]" --> B
-    B --> HW
+    B -- "UDP 5556 지령 / 5555 상태" --> PICO
+    PICO --> HW
     B -- "/joint_states [14]" --> RViz2["RViz2 / 기록"]
 ```
 
@@ -35,7 +37,8 @@ flowchart LR
 |---|---|---|
 | `hand_motion_control` | `motion_mapping_node` | 1조 관절각(MCP, PIP, DIP) → 로봇 손 10 액추에이터 목표 관절각. PIP/DIP 는 텐던 커플링(θ_DIP = 0.8·θ_PIP) 직선에 최소제곱 투영 |
 | | `low_level_controller_node` | 100 Hz 하위 제어기: 워치독(100 ms) → Tactile Latch(0.15 N, +1.4°) → 미끄러짐 반사 → 해제 인터락(텐던 슬랙 선행 → MCP 원복) → 속도 제한 → 서보 지령(텐던 horn 각 = L(θ)/r) |
-| | `servo_bus_node` | `backend:=sim` 서보 1차 지연 모델 / `backend:=hardware` STS3215 SYNC WRITE(1 Mbps) + PCA9685 PWM |
+| | `servo_bus_node` | `backend:=sim` 서보 1차 지연 모델 / **`backend:=pico`** Pico 2 자작 보드에 UDP 지령(실기 기본값) / `backend:=hardware` Pi 직결(STS3215 SYNC WRITE + PCA9685) |
+| `firmware/pico2_servo_bridge` (레포 루트) | MicroPython | Pico 2 보드: W5500 UDP 수신 → SN74125N 반이중 UART 로 STS3215 SYNC WRITE, PWM 으로 DS3225, 위치·부하 회신, 100 ms 워치독 ([README](../firmware/pico2_servo_bridge/README.md)) |
 | `team_interface_mocks` | `mock_hand_perception_node` | 1조 출력 mock data (쥐었다 폈다 반복, 30 Hz) |
 | | `mock_tactile_node` | 4조 출력 mock: 손가락 굴곡이 가상 물체에 닿으면 법선력 생성, 미끄러짐 주입 |
 | | `tactile_serial_bridge_node` | 4조 Arduino Uno 시리얼(ADC 0~1023) → 전압 → 하중(N) → 접촉·미끄러짐 토픽 |
@@ -78,8 +81,9 @@ source install/setup.bash
 ros2 launch hand_motion_control sim_bringup.launch.py
 ros2 launch hand_motion_control sim_bringup.launch.py slip_period_s:=1.5   # 미끄러짐 반사 확인
 
-# 실기 (STS3215 /dev/ttyUSB0, PCA9685 /dev/i2c-1)
+# 실기: Pi 는 연산·통신, Pico 2 보드가 서보 구동 (hand_params.yaml 의 pico.ip 를 보드 IP 로)
 ros2 launch hand_motion_control hardware_bringup.launch.py
+ros2 launch hand_motion_control hardware_bringup.launch.py servo_backend:=hardware   # Pi 직결 대안
 ros2 launch hand_motion_control hardware_bringup.launch.py use_mock_perception:=true use_tactile_bridge:=true
 ```
 
@@ -87,7 +91,7 @@ ROS 없이 로직만 검사:
 
 ```bash
 pip install pytest
-python -m pytest ros2_ws -q     # 16개
+python -m pytest ros2_ws -q     # 19개
 ```
 
 `test_nodes.py` 는 가짜 rclpy(`test_support/fake_ros.py`)로 노드 5개를 만들어 콜백을 직접 연결하고,
@@ -108,7 +112,9 @@ python -m pytest ros2_ws -q     # 16개
 | 링크 길이, θ_DIP = 0.8·θ_PIP, 0 ≤ θ ≤ π/2 | `hand_spec.py` | robotic_hand_ws/kinematics_dynamics_math_model.md, dh_parameters_report.md |
 | 100 Hz, 워치독 100 ms, 모터 ID 1~10, 1 Mbps | `controller.py`, `hand_params.yaml` | robotic_hand_ws/SYSTEM_INTERFACE_CONTRACT.md (IF-02, IF-04, IF-05B) |
 | Tactile Latch 0.15 N + 1.4°, 해제 시퀀스, ΔL = r_mcp·Δq_mcp, PCA9685 | `controller.py`, `kinematics.py`, `pca9685.py` | AI_Priority_Rules/10_SYSTEM_PIPELINE_ARCHITECTURE.md |
-| STS3215 레지스터 40/42/56/58/60 | `sts_protocol.py` | URT2_STS3215_RASPI_GUIDE.md |
+| STS3215 레지스터 40/42/56/58/60 | `sts_protocol.py`, `firmware/.../sts.py` | URT2_STS3215_RASPI_GUIDE.md |
+| Pi 는 연산·통신, SN74125N + Pico 2 보드가 서보 구동, W5500 이더넷 | `pico_link.py`, `PicoBackend`, `firmware/pico2_servo_bridge` | 사용자 설명 (2026-10-22) |
+| UDP 5555 상태 / 5556 지령, 100 ms 워치독 | `pico_link.py`, 펌웨어 `config.py` | SYSTEM_INTERFACE_CONTRACT.md (IF-03, IF-04) |
 
 ## 6. 팀 간 합의·실측이 필요한 값
 
@@ -116,7 +122,8 @@ python -m pytest ros2_ws -q     # 16개
 2. **4조**: Arduino 시리얼 한 줄 형식(제안: `a0,a1,a2,a3,a4`), 2차 다항식 계수(`fsr.poly`), 접촉 임계값, 미끄러짐 판단 기준. 지금 값은 모두 [추정].
 3. **2조(기구)**: DIP/PIP 비율 — 기구학 문서 0.8, 레포 `v8/config.py` 0.88 로 서로 다름. 텐던 권선 반경 `r_mcp, r_pip, r_dip`, horn 반경.
 4. **3조 실측**: STS3215 영점(`zero_raw`)·방향, DS3225 펄스 범위·회전 범위(현재 500~2500 µs / 270° [추정]).
-5. **모터 ID**: 인터페이스 문서는 1~10, AI_Priority_Rules/10 배선도는 0~5. 기본값은 1~6 이며 `sts.ids` 로 바꿉니다.
+5. **Pico 2 보드**: W5500·UART·SN74125N OE·PWM 핀 번호와 IP (`firmware/pico2_servo_bridge/config.py` 의 [확인 필요]). SN74125N 의 RX 버퍼 OE 를 GPIO 로 따로 뺐는지, 반전 회로로 묶었는지.
+6. **모터 ID**: 인터페이스 문서는 1~10, AI_Priority_Rules/10 배선도는 0~5. 기본값은 1~6 이며 `sts.ids` 로 바꿉니다.
 
 ## 7. 아직 하지 않은 것
 

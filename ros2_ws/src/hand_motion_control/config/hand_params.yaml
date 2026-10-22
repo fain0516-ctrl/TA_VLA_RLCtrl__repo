@@ -37,17 +37,21 @@ low_level_controller_node:
 
 servo_bus_node:
   ros__parameters:
-    backend: "sim"                     # "sim" | "hardware"
+    backend: "sim"                     # "sim" | "pico" (Pico 2 자작 보드) | "hardware" (Pi 직결)
     rate_hz: 100.0
     sim:
       tau: 0.03
       vmax: 5.0
+    pico:                              # Pi <-> Pico 2 (W5500) UDP
+      ip: "192.168.10.20"              # [확인 필요] firmware config.py 의 PICO_IP 와 같게
+      cmd_port: 5556
+      state_port: 5555
     sts:
-      port: "/dev/ttyUSB0"
+      port: "/dev/ttyUSB0"             # hardware 백엔드 전용
       ids: [1, 2, 3, 4, 5, 6]          # 엄지 0-0, 0-1, 검지~새끼 MCP
       zero_raw: [2048, 2048, 2048, 2048, 2048, 2048]   # 편 손가락 위치 [실측]
       direction: [1, 1, 1, 1, 1, 1]
-    pca:
+    pca:                               # min_us~direction 은 pico 백엔드도 사용 (DS3225 펄스 변환)
       bus: 1
       address: 64                      # 0x40
       freq_hz: 50.0

@@ -3,7 +3,8 @@
 """/servo_bus_node: 서보 지령을 시뮬레이션 또는 실제 버스로 보내고 측정값을 발행합니다.
 
 backend:=sim       서보 1차 지연 모델 (하드웨어 없이 파이프라인 검증)
-backend:=hardware  STS3215 x6 (/dev/ttyUSB0, 1 Mbps) + DS3225 x4 (PCA9685, /dev/i2c-1)
+backend:=pico      Pico 2 자작 보드 (W5500 UDP). 보드가 STS3215 x6 와 DS3225 x4 를 구동  ← 실기 기본값
+backend:=hardware  Pi 직결: STS3215 x6 (/dev/ttyUSB0, 1 Mbps) + DS3225 x4 (PCA9685, /dev/i2c-1)
 
 구독  /control/actuator_commands   std_msgs/Float32MultiArray [11]  servo_cmd[10] + torque_enabled
 발행  /hardware/servo_positions    std_msgs/Float32MultiArray [10]  rad (텐던 서보는 지령 에코)
@@ -16,7 +17,7 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32MultiArray
 
 from . import hand_spec as H
-from .backends import HardwareBackend, SimBackend
+from .backends import HardwareBackend, PicoBackend, SimBackend
 from .kinematics import TendonParams, pip_from_servo_angle
 from .pca9685 import ServoPulse
 
@@ -29,6 +30,9 @@ class ServoBusNode(Node):
         d("rate_hz", 100.0)
         d("sim.tau", 0.03)
         d("sim.vmax", 5.0)
+        d("pico.ip", "192.168.10.20")                # [확인 필요] Pico W5500 고정 IP
+        d("pico.cmd_port", 5556)
+        d("pico.state_port", 5555)
         d("sts.port", "/dev/ttyUSB0")
         d("sts.ids", [1, 2, 3, 4, 5, 6])              # [인터페이스 문서] IF-02 모터 ID 1~10
         d("sts.zero_raw", [2048] * 6)
@@ -48,9 +52,12 @@ class ServoBusNode(Node):
 
         self.tp = TendonParams(**{k: g(f"tendon.{k}") for k in vars(TendonParams())})
         self.dt = 1.0 / float(g("rate_hz"))
-        if g("backend") == "hardware":
-            pulses = [ServoPulse(g("pca.min_us"), g("pca.max_us"), g("pca.range_rad"), z, s)
-                      for z, s in zip(g("pca.zero_rad"), g("pca.direction"))]
+        pulses = [ServoPulse(g("pca.min_us"), g("pca.max_us"), g("pca.range_rad"), z, s)
+                  for z, s in zip(g("pca.zero_rad"), g("pca.direction"))]
+        if g("backend") == "pico":
+            self.bk = PicoBackend(g("pico.ip"), g("sts.zero_raw"), g("sts.direction"), pulses,
+                                  g("pico.cmd_port"), g("pico.state_port"))
+        elif g("backend") == "hardware":
             self.bk = HardwareBackend(g("sts.port"), g("sts.ids"), g("sts.zero_raw"), g("sts.direction"),
                                       g("pca.channels"), pulses, g("pca.bus"), g("pca.address"),
                                       g("pca.freq_hz"))
