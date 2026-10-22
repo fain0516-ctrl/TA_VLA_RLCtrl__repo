@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """Pi <-> Pico 2 보드 링크: 패킷 형식, 펌웨어 쪽 코드와의 일치, UDP 루프백."""
+import ctypes
 import importlib.util
 import os
+import shutil
 import socket
+import subprocess
 
 import pytest
 
@@ -70,3 +73,31 @@ def test_pico_backend_udp_loopback():
     finally:
         bk.close()
         pico.close()
+
+
+FW_C = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "firmware", "pico2_servo_bridge_c", "src")
+
+
+@pytest.mark.skipif(not shutil.which("gcc"), reason="gcc 없음")
+def test_c_firmware_link_matches_python(tmp_path):
+    """C 펌웨어 link.c 를 호스트 gcc 로 빌드해 Python 패킷과 바이트 단위로 같은지 확인."""
+    so = tmp_path / "link.so"
+    subprocess.run(["gcc", "-shared", "-fPIC", "-O2", "-o", str(so), os.path.join(FW_C, "link.c")], check=True)
+    lib = ctypes.CDLL(str(so))
+
+    class Cmd(ctypes.Structure):
+        _fields_ = [("torque", ctypes.c_bool), ("seq", ctypes.c_uint32),
+                    ("sts_raw", ctypes.c_uint16 * 6), ("pwm_us", ctypes.c_uint16 * 4)]
+
+    b = L.pack_cmd(0x01020304, True, [0, 1, 2, 3, 4, 4095], [0, 1500, 2000, 2500])
+    c = Cmd()
+    assert lib.link_unpack_cmd(b, len(b), ctypes.byref(c))
+    assert c.torque and c.seq == 0x01020304 and list(c.sts_raw) == [0, 1, 2, 3, 4, 4095]
+    assert list(c.pwm_us) == [0, 1500, 2000, 2500]
+    assert not lib.link_unpack_cmd(b[:-1], len(b) - 1, ctypes.byref(c))
+
+    out = (ctypes.c_uint8 * L.STATE_SIZE)()
+    pos = (ctypes.c_uint16 * 6)(*[2048, 1, 2, 3, 4, 4095])
+    load = (ctypes.c_int16 * 6)(*[-5, 0, 1, 2, 3, 1000])
+    lib.link_pack_state(out, ctypes.c_uint32(9), True, True, pos, load, ctypes.c_uint8(0b100))
+    assert bytes(out) == L.pack_state(9, True, True, list(pos), list(load), 0b100)
