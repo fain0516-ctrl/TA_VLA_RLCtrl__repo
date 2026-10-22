@@ -2,7 +2,7 @@
 """Pico 2 자작 보드 펌웨어 (MicroPython): Pi 지령(UDP) -> STS3215 버스 + DS3225 PWM, 상태 회신.
 
 역할 분담 (사용자 설명): Pi 5 는 연산·통신만, 이 보드가 서보 구동 전부.
-  Pi --UDP 5556--> W5500 --SPI--> Pico 2 --UART 1 Mbps + SN74125N--> STS3215 x6
+  Pi --UDP 5556--> W5500 --SPI--> Pico 2 --UART 1 Mbps--> URT-2 --> STS3215 x6
                                           --PWM 50 Hz-----------------> DS3225 x4
   Pi <--UDP 5555-- (지령 1개당 상태 1개)
 필요한 MicroPython: network.WIZNET5K 가 들어 있는 빌드 (예: WIZnet W5500-EVB-Pico2 용 펌웨어).
@@ -31,21 +31,24 @@ def net_up():
 
 
 class StsBus:
-    """SN74125N 로 TX/RX 버퍼를 번갈아 여는 반이중 UART."""
+    """STS 버스 UART. 방향 핀이 None 이면 URT-2 가 방향을 자동 전환한다고 보고 그냥 보내고 받습니다.
+    SN74125N 회로일 때는 송신 중 RX 버퍼, 수신 중 TX 버퍼를 닫습니다 (OE active-low)."""
 
     def __init__(self):
         self.uart = UART(C.STS_UART, baudrate=C.STS_BAUD, tx=Pin(C.STS_TX), rx=Pin(C.STS_RX),
                          timeout=C.READ_TIMEOUT_MS, timeout_char=1)
-        self.tx_en = Pin(C.TX_EN_N_PIN, Pin.OUT, value=1)
+        self.tx_en = Pin(C.TX_EN_N_PIN, Pin.OUT, value=1) if C.TX_EN_N_PIN is not None else None
         self.rx_en = Pin(C.RX_EN_N_PIN, Pin.OUT, value=0) if C.RX_EN_N_PIN is not None else None
 
     def send(self, pkt):
         if self.rx_en is not None:
             self.rx_en.value(1)
-        self.tx_en.value(0)
+        if self.tx_en is not None:
+            self.tx_en.value(0)
         self.uart.write(pkt)
         self.uart.flush()                       # 마지막 비트까지 송신 완료 대기
-        self.tx_en.value(1)
+        if self.tx_en is not None:
+            self.tx_en.value(1)
         if self.rx_en is not None:
             self.rx_en.value(0)
 

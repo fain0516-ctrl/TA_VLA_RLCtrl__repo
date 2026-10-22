@@ -13,14 +13,15 @@ W5500_SCK, W5500_MOSI, W5500_MISO = 18, 19, 16   # [확인 필요] (WIZnet W5500
 W5500_CS, W5500_RST = 17, 20                     # [확인 필요]
 SPI_BAUD = 20_000_000
 
-# ---- STS3215 반이중 버스 (UART + SN74125N) -----------------------------------
+# ---- STS3215 버스 (UART) --------------------------------------------------------
 STS_UART = 0
 STS_TX, STS_RX = 0, 1              # [확인 필요]
 STS_BAUD = 1_000_000
-# SN74125N 의 OE 는 active-low. TX 버퍼 OE, RX 버퍼 OE 를 각각 GPIO 로 제어.
-# RX 버퍼 OE 를 TX 쪽과 반전 회로로 묶었거나 GND 고정이면 RX_EN_N_PIN = None.
-TX_EN_N_PIN = 2                    # [확인 필요]
-RX_EN_N_PIN = 3                    # [확인 필요]
+# 기본 구성: Pico UART -> URT-2 (TX, RX, VCC, GND 공유). URT-2 가 반이중 방향 전환을 자동 처리하므로
+# 방향 제어 핀은 쓰지 않습니다 (None). URT-2 전압 점퍼는 3.3V (URT2_STS3215_RASPI_GUIDE.md 2절).
+# SN74125N 자작 반이중 회로를 쓸 때만 OE(active-low) GPIO 번호를 넣으세요.
+TX_EN_N_PIN = None
+RX_EN_N_PIN = None
 STS_IDS = (1, 2, 3, 4, 5, 6)       # 엄지 0-0, 0-1, 검지~새끼 MCP (ROS sts.ids 와 같은 순서)
 READ_TIMEOUT_MS = 1
 

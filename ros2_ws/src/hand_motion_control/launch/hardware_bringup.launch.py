@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Raspberry Pi 5 실기 구동. 1조·4조 실제 노드가 같은 토픽을 발행한다고 가정합니다.
 
-기본 백엔드는 pico (Pi 는 연산·통신, SN74125N + Pico 2 보드가 서보 구동, W5500 이더넷).
+기본 백엔드는 pico (Pi 는 연산·통신, Pico 2 보드가 서보 구동, W5500 이더넷).
 Pi 에 서보를 직접 물릴 때는 servo_backend:=hardware.
 
     ros2 launch hand_motion_control hardware_bringup.launch.py

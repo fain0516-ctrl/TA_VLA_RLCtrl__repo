@@ -4,7 +4,7 @@
 ros2_ws/src/hand_motion_control/hand_motion_control/pico_link.py 와 같은 내용이어야 합니다
 (ros2_ws 테스트가 두 파일의 패킷이 같은지 확인).
 
-구성 (사용자 설명): Pi 는 연산·통신만 맡고, SN74125N + Pico 2 자작 보드가 STS3215 버스와 DS3225 서보를 직접 구동.
+구성 (사용자 설명): Pi 는 연산·통신만 맡고, Pico 2 자작 보드가 STS3215 버스(URT-2 경유)와 DS3225 서보를 구동.
 포트는 테스트 베드 규약을 따릅니다 [인터페이스 문서 IF-03/IF-04]:
   Pi -> Pico  UDP 5556  지령 (100 Hz)
   Pico -> Pi  UDP 5555  상태 (지령 1개당 1개)
