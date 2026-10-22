@@ -11,15 +11,15 @@ STATE_PORT = 5555                  # Pico -> Pi 상태 (지령을 보낸 주소�
 # 2026-10-22 회로도 캡처에서 읽은 배선 (J1 "W5500R" 아래 / J2 "W5500L" 위, 각 6핀, 1번 = GND 쪽, 실물은 위아래 반전 결선):
 #   J1: 1 GND, 2 GND, 3 GP19, 4 GP18, 5 GP17, 6 GP20 (10 kΩ 풀업)
 #   J2: 1 GND, 2 GND, 3 3V3, 4 NC, 5 GP21, 6 GP16 (10 kΩ 풀업 + 100 nF 접지 = 리셋용 RC 형태)
-# GP18/19/17 은 RP2350 SPI0 의 SCK/TX(MOSI)/CSn 자리와 맞습니다.
-# MISO 와 RSTn 이 GP16/GP21 중 어느 쪽인지는 W5500S 모듈 핀 표기로 확인해야 합니다 [확인 필요].
+# GP18/19/17/16 은 RP2350 SPI0 의 SCK/TX(MOSI)/CSn/RX(MISO) 자리와 맞습니다.
+# 사용자 확인 (2026-10-22): J2-6 = MISO, J2-5 = RSTn.
+# 주의: GP16(MISO) 넷에 C1 100 nF 가 GND 로 달려 있어 SPI 파형이 무너집니다. C1 은 실장하지 마세요 (R1 10 kΩ 풀업은 무방).
 W5500_SPI = 0
 W5500_SCK, W5500_MOSI = 18, 19
 W5500_CS = 17
 W5500_INT = 20                     # 드라이버는 INT 를 쓰지 않음 (참고용)
-W5500_MISO, W5500_RST = 16, 21     # [확인 필요] 반대(MISO=21, RST=16)라면 숫자를 바꾸고 SOFT_SPI = True
-# GP21 은 SPI0 RX(MISO) 로 쓸 수 없는 핀이라, MISO 가 GP21 이면 소프트웨어 SPI 로 돌립니다 (느려짐).
-SOFT_SPI = False
+W5500_MISO, W5500_RST = 16, 21
+SOFT_SPI = False                   # 하드웨어 SPI0 사용
 SPI_BAUD = 20_000_000
 
 # ---- STS3215 버스 (UART) --------------------------------------------------------
