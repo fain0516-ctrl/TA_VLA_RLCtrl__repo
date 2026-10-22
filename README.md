@@ -11,3 +11,4 @@ RLCtrl, 2026-09-26 , 연결 확인
 | `docs/research/` | 연구 정리 01~04 (논문 수집, 보상·훈련, 환경·sim-to-real, **팀 적용 가이드**) |
 | `tests/test_v8_smoke.py` | V8 스모크 테스트 |
 | `reverseeng/` | 기기 프로필 수집 골격 |
+| `ros2_ws/` | **ROS 2 재구성**: 1조(관절각)·4조(촉각) 입력을 받는 3조 Motion Mapping·하위 제어기·서보 버스 ([ros2_ws/README.md](ros2_ws/README.md)) |
