@@ -6,6 +6,8 @@ param([switch]$Cpu, [string]$Venv = ".venv_picotopi")
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+# E:\PICOtoPI 배치(modules\, legacy\)면 import 경로 추가
+if (Test-Path "modules\picotopi") { $env:PYTHONPATH = "$Root\modules;$Root\legacy;$env:PYTHONPATH" }
 
 if (-not (Test-Path "$Venv\Scripts\python.exe")) { py -3.10 -m venv $Venv }
 $Py = Join-Path $Root "$Venv\Scripts\python.exe"
