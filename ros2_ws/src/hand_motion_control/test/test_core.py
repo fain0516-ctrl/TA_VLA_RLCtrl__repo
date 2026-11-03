@@ -14,8 +14,9 @@ from hand_motion_control.pca9685 import ServoPulse, prescale_for, us_to_ticks
 
 
 def test_spec_sizes_and_coupling():
-    assert H.N_JOINTS == 14 and H.N_ACTUATORS == 10
-    q = H.actuators_to_joints([0.1, 0.2, 0.3, 0.3, 0.3, 0.3, 1.0, 1.0, 1.0, 1.0])
+    assert H.N_JOINTS == 14 and H.N_ACTUATORS == 10 and H.N_STS == 5 and H.N_TENDON == 5
+    q = H.actuators_to_joints([0.1, 0.3, 0.3, 0.3, 0.3, 0.2, 1.0, 1.0, 1.0, 1.0])
+    assert q[0] == pytest.approx(0.1) and q[1] == pytest.approx(0.2)   # 엄지 0-0 모터, 0-1 텐던
     assert q[H.joint_index(1, 2)] == pytest.approx(0.8)
     assert H.JOINT_NAMES[H.joint_index(4, 2)] == "joint_4_2"
 
@@ -46,10 +47,11 @@ def test_mapping_full_and_missing():
     p = MappingParams()
     human = {"thumb_mcp": 0.4, "thumb_ip": 0.5, "index_mcp": 0.3, "index_pip": 1.0, "index_dip": 0.8}
     out, missing = map_human_to_robot(human, p)
-    assert out[0] == pytest.approx(0.4) and out[2] == pytest.approx(0.3) and out[6] == pytest.approx(1.0)
+    assert out[0] == pytest.approx(0.4) and out[5] == pytest.approx(0.5)     # 엄지: 모터 0-0, 텐던 0-1
+    assert out[1] == pytest.approx(0.3) and out[6] == pytest.approx(1.0)     # 검지: MCP 슬롯 1, 텐던 슬롯 6
     assert "middle_mcp" in missing and len(out) == 10
     out2, _ = map_human_to_robot({"index_mcp": 9.0}, p, previous=out)
-    assert out2[2] == pytest.approx(H.Q_MAX)       # 절삭
+    assert out2[1] == pytest.approx(H.Q_MAX)       # 절삭
     assert out2[0] == pytest.approx(0.4)          # 누락 관절은 이전 값 유지
 
 
@@ -105,10 +107,11 @@ def test_controller_release_interlock():
     _run(c, 0.0, 60)
     c.set_target([0.0] * 10, 0.6)
     out = c.tick(0.6)
-    assert out["joint_cmd"][2] == pytest.approx(1.0)            # MCP 는 텐던이 풀릴 때까지 대기
+    assert out["joint_cmd"][1] == pytest.approx(1.0)            # 검지 MCP 는 텐던이 풀릴 때까지 대기
+    assert out["joint_cmd"][0] == pytest.approx(1.0)            # 엄지도 같은 규칙
     assert out["joint_cmd"][6] < 1.0
     out = _run(c, 0.61, 60)
-    assert out["joint_cmd"][2] == pytest.approx(0.0, abs=1e-9)
+    assert out["joint_cmd"][1] == pytest.approx(0.0, abs=1e-9)
 
 
 def test_sts_packets():

@@ -7,8 +7,10 @@
 
   python pc_test.py monitor                    토크 끔 상태로 위치만 읽기 (서보 안 움직임, 처음엔 이것부터)
   python pc_test.py hold                       현재 위치에서 STS 토크 켜고 유지
-  python pc_test.py sweep --servo 2 --amp 100  STS 한 개를 현재 위치 기준 ±amp raw 사인파로 (100 raw ≈ 8.8°)
-  python pc_test.py pwm --ch 0 --us 1500       DS3225 한 채널에 펄스 (나머지 채널은 펄스 끔)
+  python pc_test.py sweep --servo 1 --amp 100  STS 한 개를 현재 위치 기준 ±amp raw 사인파로 (100 raw ≈ 8.8°)
+  python pc_test.py pwm --ch 1 --us 1500       DS3225 한 채널에 펄스 (나머지 채널은 펄스 끔)
+
+순서는 모두 엄지, 검지, 중지, 약지, 새끼 (STS 0~4 = ID 1~5, PWM 0 = 엄지 GP6, 1~4 = GP2~5 / U4~U7).
 
 Ctrl+C 로 끝내면 토크 끔 지령을 보내고 종료합니다.
 패킷 형식은 ros2_ws/.../pico_link.py 와 같습니다.
@@ -19,13 +21,15 @@ import socket
 import struct
 import time
 
-CMD_FMT = "<2sBBI6H4H"       # 28 B
-STATE_FMT = "<2sBBI6H6hBB"   # 34 B
+CMD_FMT = "<2sBBI5H5H"       # 28 B (버전 2)
+STATE_FMT = "<2sBBI5H5hBB"   # 30 B
+VERSION = 2
+N = 5                        # STS 5개, PWM 5개
 CMD_PORT, STATE_PORT = 5556, 5555
 
 
 def pack_cmd(seq, torque, sts_raw, pwm_us):
-    return struct.pack(CMD_FMT, b"H3", 1, 1 if torque else 0, seq & 0xFFFFFFFF,
+    return struct.pack(CMD_FMT, b"H3", VERSION, 1 if torque else 0, seq & 0xFFFFFFFF,
                        *[max(0, min(4095, int(v))) for v in sts_raw], *[int(v) for v in pwm_us])
 
 
@@ -33,10 +37,10 @@ def unpack_state(buf):
     if len(buf) != struct.calcsize(STATE_FMT):
         return None
     v = struct.unpack(STATE_FMT, buf)
-    if v[0] != b"H3" or v[1] != 1:
+    if v[0] != b"H3" or v[1] != VERSION:
         return None
     return dict(torque=bool(v[2] & 1), watchdog=bool(v[2] & 2), seq=v[3],
-                pos=list(v[4:10]), load=list(v[10:16]), err=v[16])
+                pos=list(v[4:9]), load=list(v[9:14]), err=v[14])
 
 
 class Board:
@@ -65,7 +69,7 @@ def show(st, extra=""):
     if st is None:
         print("응답 없음 (IP, 랜선, 방화벽 UDP 5555 허용 여부 확인)")
         return
-    errs = [str(k) for k in range(6) if st["err"] & (1 << k)]
+    errs = [str(k) for k in range(N) if st["err"] & (1 << k)]
     print(f"seq {st['seq']:6d}  토크 {'ON ' if st['torque'] else 'OFF'}  워치독 {'동작' if st['watchdog'] else '정상'}  "
           f"위치 {st['pos']}  부하 {st['load']}  STS 응답 없음: {','.join(errs) or '없음'} {extra}")
 
@@ -74,21 +78,21 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=["monitor", "hold", "sweep", "pwm"])
     ap.add_argument("--ip", default="192.168.10.20", help="보드 IP (config.h PICO_IP)")
-    ap.add_argument("--servo", type=int, default=0, help="sweep: STS 순번 0~5 (ID 1~6)")
+    ap.add_argument("--servo", type=int, default=0, help="sweep: STS 순번 0~4 (엄지~새끼, ID 1~5)")
     ap.add_argument("--amp", type=int, default=100, help="sweep: 진폭 raw (4096 = 360°)")
     ap.add_argument("--period", type=float, default=3.0, help="sweep: 주기 s")
-    ap.add_argument("--ch", type=int, default=0, help="pwm: 채널 0~3 (GP2~GP5, U4~U7)")
+    ap.add_argument("--ch", type=int, default=0, help="pwm: 채널 0~4 (0 엄지 GP6, 1~4 검지~새끼 GP2~5 / U4~U7)")
     ap.add_argument("--us", type=int, default=1500, help="pwm: 펄스 µs (500~2500)")
     a = ap.parse_args()
 
     b = Board(a.ip)
-    off = [0, 0, 0, 0]
+    off = [0] * N
     print(f"보드 {a.ip}:{CMD_PORT} 로 지령, 상태는 이 PC 의 UDP {STATE_PORT} 에서 받음")
 
     # 먼저 토크 끔 상태로 현재 위치를 읽어 둡니다 (토크를 켤 때 갑자기 튀지 않게).
     st = None
     for _ in range(50):
-        st = b.exchange(False, [2048] * 6, off) or st
+        st = b.exchange(False, [2048] * N, off) or st
         time.sleep(0.01)
     show(st, "(시작 위치)")
     if st is None:

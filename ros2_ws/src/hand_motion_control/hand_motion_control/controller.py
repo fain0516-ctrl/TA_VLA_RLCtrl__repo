@@ -21,7 +21,7 @@ from . import hand_spec as H
 from .kinematics import TendonParams, tendon_servo_angle
 
 # 액추에이터 슬롯 -> 촉각 손가락 인덱스 (0 엄지 .. 4 새끼)
-SLOT_FINGER = (0, 0, 1, 2, 3, 4, 1, 2, 3, 4)
+SLOT_FINGER = tuple(range(H.N_STS)) + tuple(range(H.N_TENDON))
 
 
 @dataclass
@@ -51,7 +51,7 @@ class LowLevelController:
         self.forces = [0.0] * 5
         self.slip = [False] * 5
         self.latch = [None] * H.N_ACTUATORS       # 래칭 상한 (rad) 또는 None
-        self.slip_extra = [0.0] * 4               # 손가락 1~4 텐던 추가 증분
+        self.slip_extra = [0.0] * 5               # 손가락별 텐던 추가 증분 (엄지..새끼)
         self.torque_enabled = True
         self.state = "ok"
 
@@ -107,16 +107,15 @@ class LowLevelController:
 
     def _slip_reflex(self, goal):
         p = self.p
-        for k in range(4):
-            f = k + 1
-            slot = H.TENDON_SLOTS[k]
+        for f in range(5):
+            slot = H.TENDON_SLOTS[f]
             if self.slip[f] and self.forces[f] < p.force_limit:
-                self.slip_extra[k] = min(self.slip_extra[k] + p.slip_step, p.slip_max_extra)
+                self.slip_extra[f] = min(self.slip_extra[f] + p.slip_step, p.slip_max_extra)
             if self.forces[f] < p.latch_force:
-                self.slip_extra[k] = 0.0      # 접촉이 끊기면 증분 해제
-            if self.slip_extra[k] > 0.0:
+                self.slip_extra[f] = 0.0      # 접촉이 끊기면 증분 해제
+            if self.slip_extra[f] > 0.0:
                 base = goal[slot]
-                goal[slot] = base + self.slip_extra[k]
+                goal[slot] = base + self.slip_extra[f]
                 if self.latch[slot] is not None:
                     self.latch[slot] = max(self.latch[slot], goal[slot])
             if self.forces[f] >= p.force_limit:
@@ -124,19 +123,19 @@ class LowLevelController:
 
     def _release_interlock(self, goal):
         """MCP 를 펴려 할 때, 텐던이 아직 감겨 있으면 MCP 를 붙잡아 둡니다."""
-        for k in range(4):
-            mcp, ten = H.STS_SLOTS[2 + k], H.TENDON_SLOTS[k]
+        for f in range(5):
+            mcp, ten = H.STS_SLOTS[f], H.TENDON_SLOTS[f]
             opening = goal[mcp] < self.cmd[mcp]
             tendon_wound = self.cmd[ten] > goal[ten] + self.p.release_eps
             if opening and tendon_wound:
                 goal[mcp] = self.cmd[mcp]
 
     def _output(self):
-        servo = list(self.cmd[:6])
-        for k in range(4):
-            mcp = self.cmd[2 + k]
-            pip = self.cmd[6 + k]
-            servo.append(tendon_servo_angle(mcp, pip, self.tp))
+        servo = [self.cmd[i] for i in H.STS_SLOTS]
+        for f in range(5):
+            mcp = self.cmd[H.STS_SLOTS[f]]
+            pip = self.cmd[H.TENDON_SLOTS[f]]
+            servo.append(tendon_servo_angle(mcp, pip, self.tp, thumb=(f == 0)))
         return dict(
             joint_cmd=list(self.cmd),
             servo_cmd=servo,

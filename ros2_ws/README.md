@@ -20,7 +20,7 @@ flowchart LR
         B["/servo_bus_node<br/>sim | pico | hardware"]
     end
     PICO["Pico 2 자작 보드<br/>(W5500 이더넷)"]
-    HW["STS3215 x6 (반이중 UART)<br/>DS3225 x4 (PWM)"]
+    HW["STS3215 x5 (반이중 UART)<br/>DS3225 x5 (PWM)"]
 
     P -- "/hand_perception/joint_angles<br/>JointState" --> M
     M -- "/control/target_joint_positions [10]" --> C
@@ -61,7 +61,8 @@ flowchart LR
 | `/joint_states` | `sensor_msgs/JointState` [14] | 100 Hz | 서보 → RViz2 | 관절 이름 `joint_i_j` (기구학 문서 명명 규칙) |
 
 배열 순서
-- 10 액추에이터: `thumb_0_0, thumb_0_1, index_mcp, middle_mcp, ring_mcp, pinky_mcp, index_tendon, middle_tendon, ring_tendon, pinky_tendon`
+- 10 액추에이터: `thumb_mcp, index_mcp, middle_mcp, ring_mcp, pinky_mcp, thumb_tendon, index_tendon, middle_tendon, ring_tendon, pinky_tendon`
+  (2조 구조, 2026-11-03: 다섯 손가락 뿌리 관절은 STS3215 직접 구동, 나머지 관절은 DS3225 텐던. 엄지 텐던은 0-1 관절 하나)
 - 14 관절: `joint_0_0, joint_0_1, joint_1_0, joint_1_1, joint_1_2, …, joint_4_2`
 - 촉각 5: 엄지, 검지, 중지, 약지, 새끼
 
@@ -121,7 +122,7 @@ python -m pytest ros2_ws -q     # 19개
 
 1. **1조**: JointState 관절 이름(기본값 위 표), 엄지 관절을 `thumb_mcp/thumb_ip` 로 줄지, 사람 손 → 로봇 손 `gain/offset`.
 2. **4조**: Arduino 시리얼 한 줄 형식(제안: `a0,a1,a2,a3,a4`), 2차 다항식 계수(`fsr.poly`), 접촉 임계값, 미끄러짐 판단 기준. 지금 값은 모두 [추정].
-3. **2조(기구)**: DIP/PIP 비율 — 기구학 문서 0.8, 레포 `v8/config.py` 0.88 로 서로 다름. 텐던 권선 반경 `r_mcp, r_pip, r_dip`, horn 반경 (2조 보고서에 없음). 마디 길이가 관절 축 간 거리인지. 약지·소지 8° 의 회전 방향. 2조 보고서는 손바닥 모터 5개(손가락마다 뿌리 관절 1개)·나머지 관절 와이어 구동이라, 엄지 STS3215 2개(3조 보고서)와 다름.
+3. **2조(기구)**: DIP/PIP 비율 — 기구학 문서 0.8, 레포 `v8/config.py` 0.88 로 서로 다름. 텐던 권선 반경 `r_mcp, r_pip, r_dip`, horn 반경 (2조 보고서에 없음). 마디 길이가 관절 축 간 거리인지. 약지·소지 8° 의 회전 방향. 엄지 텐던 DS3225 출력 핀 (보드에 다섯 번째 버퍼 없음, 펌웨어는 GP6 가정).
 4. **3조 실측**: STS3215 영점(`zero_raw`)·방향, DS3225 펄스 범위·회전 범위(현재 500~2500 µs / 270° [추정]).
 5. **Pico 2 보드**: W5500 SPI·UART·PWM 핀 번호 (`firmware/pico2_servo_bridge/config.py` 의 [확인 필요]). 받은 부품표(BOM)에는 핀 연결 정보가 없어 회로도가 필요합니다. IP 는 정해서 쓰는 값이며 방법은 펌웨어 README 의 "IP 설정과 확인".
 6. **모터 ID**: 인터페이스 문서는 1~10, AI_Priority_Rules/10 배선도는 0~5. 기본값은 1~6 이며 `sts.ids` 로 바꿉니다.

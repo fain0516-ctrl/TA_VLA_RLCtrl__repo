@@ -4,6 +4,7 @@
 - 손끝 위치: [기구학 문서] 2.3 폐형태 수식 (MCP 원점, 굴곡 평면 X-Z). 마디 길이는 [2조 보고서] 손가락별 값.
 - 텐던 길이 L(θ): 3조 보고서의 "Pin joint 에서 원하는 굽힘각(θ)일 때 조절해야 할 Tendon 의 길이(L)".
   여기서는 관절마다 유효 권선 반경이 일정한 모델 L = r_MCP·θ_MCP + r_PIP·θ_PIP + r_DIP·θ_DIP 를 씁니다.
+  엄지는 관절이 둘이라 L = r_MCP·θ_0-0 + r_PIP·θ_0-1 (반경은 4지와 같은 [추정] 값).
   MCP 항은 [AI_Priority_Rules/10] 2.1 Kinematic Decoupler (ΔL = r_mcp·Δq_mcp) 와 같습니다.
   3조가 논문에서 유도한 수식이 확정되면 tendon_length() 만 바꾸면 됩니다.
 - 반경 기본값은 레포 v8/config.py 의 [추정] 값(R_MCP 8 mm, R_PIP 7 mm, R_DIP 5 mm, 스풀 8 mm)과 같습니다.
@@ -42,17 +43,21 @@ def thumb_tip_local(q0, q1):
     return x, z
 
 
-def tendon_length(q_mcp, q_pip, p: TendonParams):
-    """완전히 편 자세 기준 텐던 감김 길이 L (m)."""
-    return p.r_mcp * q_mcp + (p.r_pip + p.ratio * p.r_dip) * q_pip
+def _pip_arm(p: TendonParams, thumb=False):
+    """둘째 관절 1 rad 당 텐던 길이. 엄지는 셋째 관절이 없어 DIP 항이 없습니다."""
+    return p.r_pip if thumb else p.r_pip + p.ratio * p.r_dip
 
 
-def tendon_servo_angle(q_mcp, q_pip, p: TendonParams):
-    """목표 (MCP, PIP) 를 만들기 위한 텐던 서보 horn 회전각 (rad)."""
-    return tendon_length(q_mcp, q_pip, p) / p.r_pulley
+def tendon_length(q_mcp, q_pip, p: TendonParams, thumb=False):
+    """완전히 편 자세 기준 텐던 감김 길이 L (m). 엄지는 q_pip = 0-1 관절각."""
+    return p.r_mcp * q_mcp + _pip_arm(p, thumb) * q_pip
 
 
-def pip_from_servo_angle(servo_angle, q_mcp, p: TendonParams):
+def tendon_servo_angle(q_mcp, q_pip, p: TendonParams, thumb=False):
+    """목표 (뿌리 관절, 둘째 관절) 를 만들기 위한 텐던 서보 horn 회전각 (rad)."""
+    return tendon_length(q_mcp, q_pip, p, thumb) / p.r_pulley
+
+
+def pip_from_servo_angle(servo_angle, q_mcp, p: TendonParams, thumb=False):
     """tendon_servo_angle 의 역함수 (시뮬레이션·피드백 추정용)."""
-    k = p.r_pip + p.ratio * p.r_dip
-    return (servo_angle * p.r_pulley - p.r_mcp * q_mcp) / k
+    return (servo_angle * p.r_pulley - p.r_mcp * q_mcp) / _pip_arm(p, thumb)

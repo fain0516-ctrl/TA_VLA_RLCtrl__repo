@@ -2,8 +2,8 @@
 """Pico 2 자작 보드 펌웨어 (MicroPython): Pi 지령(UDP) -> STS3215 버스 + DS3225 PWM, 상태 회신.
 
 역할 분담 (사용자 설명): Pi 5 는 연산·통신만, 이 보드가 서보 구동 전부.
-  Pi --UDP 5556--> W5500 --SPI0--> Pico 2 --UART0 1 Mbps--> ADuM1201 --> URT-2 --> STS3215 x6
-                                           --PWM 50 Hz--> SN74HCT125N ---------------> DS3225 x4
+  Pi --UDP 5556--> W5500 --SPI0--> Pico 2 --UART0 1 Mbps--> ADuM1201 --> URT-2 --> STS3215 x5
+                                           --PWM 50 Hz--> SN74HCT125N ---------------> DS3225 x5 (엄지는 GP6 직결 가정)
   Pi <--UDP 5555-- (지령 1개당 상태 1개)
 필요한 MicroPython: network.WIZNET5K 가 들어 있는 빌드 (예: WIZnet W5500-EVB-Pico2 용 펌웨어).
 """

@@ -4,8 +4,9 @@ MicroPython 판(`../pico2_servo_bridge/`)과 **같은 동작, 같은 패킷**의
 W5500 은 WIZnet ioLibrary 없이 레지스터를 직접 다루는 작은 드라이버(`src/w5500.c`, 소켓 0 UDP 하나)를 씁니다.
 
 ```
-노트북/Pi ──UDP 5556 지령──▶ W5500 ─SPI0 10 MHz─ Pico 2 ─UART0 1 Mbps─▶ ADuM1201 ─▶ URT-2 ─▶ STS3215 x6 (ID 1~6)
-          ◀─UDP 5555 상태───                            └─PWM 50 Hz─▶ SN74HCT125N ──────────▶ DS3225 x4 (U4~U7)
+노트북/Pi ──UDP 5556 지령──▶ W5500 ─SPI0 10 MHz─ Pico 2 ─UART0 1 Mbps─▶ ADuM1201 ─▶ URT-2 ─▶ STS3215 x5 (ID 1~5, 엄지~새끼 뿌리 관절)
+          ◀─UDP 5555 상태───                            └─PWM 50 Hz─▶ SN74HCT125N ──────────▶ DS3225 검지~새끼 (U4~U7)
+                                                         └─PWM 50 Hz─▶ (GP6 직결, 가정) ────▶ DS3225 엄지
 ```
 
 ## 바로 올리기 (빌드 불필요)
@@ -14,7 +15,7 @@ W5500 은 WIZnet ioLibrary 없이 레지스터를 직접 다루는 작은 드라
 2. `prebuilt/pico2_servo_bridge.uf2` 를 그 드라이브에 끌어다 놓습니다. 자동으로 재부팅되며 실행됩니다.
 3. 상태 확인: USB 시리얼 포트(Windows 장치 관리자의 COMx, 속도 값 무관)를 PuTTY·Arduino 시리얼 모니터 등으로 열면 1 초마다 출력됩니다.
    ```
-   [sts] ID 1: 응답 ...
+   [sts] ID 1: 응답 ...   (ID 1~5 = 엄지~새끼 뿌리 관절)
    [net] W5500 OK, IP 192.168.10.20, UDP 5556, MAC 02:..
    [run] 지령 100 Hz, 잘못된 패킷 0, 토크 OFF, 워치독 정상, STS 오류 0x00, 위치 2048 ...
    ```
@@ -30,10 +31,16 @@ W5500 은 WIZnet ioLibrary 없이 레지스터를 직접 다루는 작은 드라
    ```
    python tools/pc_test.py monitor                    # 토크 끔, 위치만 읽기 (먼저 이것으로 통신 확인)
    python tools/pc_test.py hold                       # 현재 위치에서 STS 토크 켜고 유지
-   python tools/pc_test.py sweep --servo 2 --amp 100  # STS 순번 2(ID 3) 를 ±100 raw(약 ±8.8°) 사인파
-   python tools/pc_test.py pwm --ch 0 --us 1500       # DS3225 채널 0(GP2, U4) 에 1500 µs
+   python tools/pc_test.py sweep --servo 1 --amp 100  # STS 순번 1(검지, ID 2) 를 ±100 raw(약 ±8.8°) 사인파
+   python tools/pc_test.py pwm --ch 1 --us 1500       # DS3225 채널 1(검지, GP2, U4) 에 1500 µs. 채널 0 = 엄지(GP6)
    ```
    Ctrl+C 로 끝내면 토크 끔 지령을 보냅니다. 텐던 서보는 걸린 상태에서 범위 끝 펄스를 주지 않도록 조심하세요.
+
+## 엄지 텐던 출력 (보드에 없음)
+
+2조 구조로 바꾸면서 DS3225 가 5개(엄지 추가)가 되었지만, 보드의 SN74HCT125N 버퍼는 4개(U4~U7)뿐입니다.
+펌웨어는 엄지 텐던을 **GP6 에서 직접** 내보낸다고 가정합니다 (`config.h` `PWM_PINS` 첫 값).
+GP6 가 보드에서 비어 있는지, DS3225 가 3.3 V 신호로 동작하는지 확인하고, 다른 핀이면 `PWM_PINS` 를 바꿔 다시 빌드하세요.
 
 ## 다시 빌드 (설정을 바꿨을 때)
 

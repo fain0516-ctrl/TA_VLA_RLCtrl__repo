@@ -8,11 +8,11 @@
 - [2조 보고서] 2조 와이어 구동 로봇 손 실험 중간보고서 (2026-10-01): 손가락·손바닥 CAD 제원 (기구 제작 담당)
 - [추정] 실측 전 임시값. config/hand_params.yaml 에서 덮어씁니다.
 
-구동 구조 [3조 보고서]
-- 검지·중지·약지·새끼 MCP: 모터 축에 직접 강체 고정하는 직접 구동 (Feetech STS3215-C018 12V 30kg, 시리얼 버스)
-- PIP/DIP: 원위부에서 서보모터 Reel(horn)에 Tendon 연결 (DS3225 25kg 디지털 서보, 2팀 구매분)
-- 엄지: STS3215 2개 직접 구동 [기구학 문서]
-=> 액추에이터 10개 (STS3215 6 + DS3225 4), 관절 14개 (엄지 2 + 4지 x 3)
+구동 구조 [2조 보고서 3·4절, 사용자 결정 2026-11-03]
+- 다섯 손가락 모두 첫 번째 관절(뿌리)은 손바닥 안 모터로 직접 구동 (손바닥 내 모터 5개, Feetech STS3215-C018, 시리얼 버스)
+- 나머지 관절은 와이어 텐던으로 구동: 서보모터 Reel(horn)에 Tendon 연결 (DS3225 25kg 디지털 서보, 2팀 구매분 5개 [3조 보고서])
+  검지~새끼는 텐던 하나가 PIP·DIP 를 함께 굽힘 (θ_DIP = κ·θ_PIP), 엄지는 텐던이 둘째 관절(0-1) 하나를 굽힘
+=> 액추에이터 10개 (STS3215 5 + DS3225 5), 관절 14개 (엄지 2 + 4지 x 3)
 """
 import math
 
@@ -26,17 +26,17 @@ JOINT_NAMES = (
 N_JOINTS = len(JOINT_NAMES)  # 14
 
 # 10 액추에이터 순서. /control/target_joint_positions 와 /control/actuator_commands 의 배열 순서이기도 합니다.
-#   0,1 : 엄지 0-0, 0-1 (STS3215)
-#   2~5 : 검지~새끼 MCP i-0 (STS3215)
-#   6~9 : 검지~새끼 텐던 i-1 (DS3225, PIP 기준 각)
+#   0~4 : 엄지~새끼 뿌리 관절 i-0 (STS3215)          -> 손가락 f 는 슬롯 f
+#   5~9 : 엄지~새끼 텐던 (DS3225, 엄지 0-1 / 4지 PIP 기준 각) -> 손가락 f 는 슬롯 5+f
 ACTUATOR_NAMES = (
-    "thumb_0_0", "thumb_0_1",
-    "index_mcp", "middle_mcp", "ring_mcp", "pinky_mcp",
-    "index_tendon", "middle_tendon", "ring_tendon", "pinky_tendon",
+    "thumb_mcp", "index_mcp", "middle_mcp", "ring_mcp", "pinky_mcp",
+    "thumb_tendon", "index_tendon", "middle_tendon", "ring_tendon", "pinky_tendon",
 )
 N_ACTUATORS = len(ACTUATOR_NAMES)  # 10
-STS_SLOTS = tuple(range(0, 6))
-TENDON_SLOTS = tuple(range(6, 10))
+N_STS = 5
+N_TENDON = 5
+STS_SLOTS = tuple(range(0, N_STS))
+TENDON_SLOTS = tuple(range(N_STS, N_ACTUATORS))
 
 # 손가락 마디 길이 m [2조 보고서 2. 손가락 주요 제원] (첫째 마디, 둘째 마디, 끝마디)
 # 기구는 2조가 만들므로 2조 CAD 값을 씁니다. 표에 단위 표기가 없어 같은 보고서의 손바닥 표(mm)와 같은 mm 로 읽었습니다.
@@ -86,10 +86,10 @@ def actuators_to_joints(act, ratio=DIP_PIP_RATIO):
     if len(act) != N_ACTUATORS:
         raise ValueError(f"{N_ACTUATORS}개가 필요합니다 ({len(act)}개 수신)")
     q = [0.0] * N_JOINTS
-    q[0], q[1] = act[0], act[1]
+    q[0], q[1] = act[STS_SLOTS[0]], act[TENDON_SLOTS[0]]
     for f in range(1, 5):
-        mcp = act[1 + f]
-        pip = act[5 + f]
+        mcp = act[STS_SLOTS[f]]
+        pip = act[TENDON_SLOTS[f]]
         q[joint_index(f, 0)] = mcp
         q[joint_index(f, 1)] = pip
         q[joint_index(f, 2)] = ratio * pip

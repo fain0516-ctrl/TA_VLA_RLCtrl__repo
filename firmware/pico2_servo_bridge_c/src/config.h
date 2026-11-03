@@ -25,13 +25,15 @@
 #define STS_TX         0
 #define STS_RX         1
 #define STS_BAUD       1000000
-#define STS_N          6
-#define STS_IDS        {1, 2, 3, 4, 5, 6}   // 엄지 0-0, 0-1, 검지~새끼 MCP (ROS sts.ids 와 같은 순서)
+#define STS_N          5
+#define STS_IDS        {1, 2, 3, 4, 5}      // 엄지~새끼 뿌리 관절 (ROS sts.ids 와 같은 순서) [확인 필요: 실제 ID]
 #define STS_TIMEOUT_US 1500                 // 응답 대기 (첫 바이트), 이후 바이트 간 200 µs
 
-// ---- DS3225 텐던 서보 PWM (GP2~5 -> SN74HCT125N -> U4~U7) ------------------------
-#define PWM_N          4
-#define PWM_PINS       {2, 3, 4, 5}         // 검지, 중지, 약지, 새끼 [확인 필요: U4~U7 손가락 순서]
+// ---- DS3225 텐던 서보 PWM (엄지~새끼 5개) -----------------------------------------
+// 검지~새끼: GP2~5 -> SN74HCT125N -> U4~U7 [확인 필요: U4~U7 손가락 순서]
+// 엄지: 보드에 다섯 번째 출력이 없습니다 (SN74HCT125N 버퍼 4개). 빈 GPIO 에서 직접 뽑는다고 가정 [확인 필요: 핀, 레벨 변환]
+#define PWM_N          5
+#define PWM_PINS       {6, 2, 3, 4, 5}      // 엄지 GP6(가정), 검지, 중지, 약지, 새끼
 #define PWM_MIN_US     500
 #define PWM_MAX_US     2500                 // 범위 밖 지령은 절삭 [추정: DS3225 사양 확인]
 

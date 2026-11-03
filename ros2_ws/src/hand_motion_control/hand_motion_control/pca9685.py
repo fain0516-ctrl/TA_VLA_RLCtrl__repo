@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """PCA9685 16-Ch PWM 드라이버로 텐던 서보(DS3225) 구동.
 
-배선은 [AI_Priority_Rules/10] 5절 (Raspberry Pi 5 /dev/i2c-1 -> PCA9685 -> 텐던 서보 4개) 을 따릅니다.
+배선은 [AI_Priority_Rules/10] 5절 (Raspberry Pi 5 /dev/i2c-1 -> PCA9685 -> 텐던 서보) 을 따릅니다. 텐던 서보는 2조 구조에 맞춰 5개입니다.
 펄스 폭 범위와 회전 범위는 [추정] 값이며, 2팀이 받은 DS3225 의 실제 사양으로 config 에서 바꿉니다.
 """
 import time

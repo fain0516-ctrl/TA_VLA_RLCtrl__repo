@@ -60,20 +60,20 @@ def map_human_to_robot(human, p: MappingParams, previous=None):
         return v
 
     t_names = p.names["thumb"]
-    for k in (0, 1):
+    for k, slot in ((0, H.STS_SLOTS[0]), (1, H.TENDON_SLOTS[0])):   # 엄지 MCP -> 모터, IP -> 텐던
         v = get(t_names[k])
         if v is not None:
-            raw[k], fresh[k] = v, True
+            raw[slot], fresh[slot] = v, True
 
-    for f, finger in enumerate(H.FINGERS[1:]):
+    for f, finger in enumerate(H.FINGERS[1:], start=1):
         mcp_n, pip_n, dip_n = p.names[finger]
         mcp = get(mcp_n)
         pip = get(pip_n)
         dip = human.get(dip_n)          # DIP 는 없어도 PIP 만으로 매핑 가능
         if mcp is not None:
-            raw[2 + f], fresh[2 + f] = mcp, True
+            raw[H.STS_SLOTS[f]], fresh[H.STS_SLOTS[f]] = mcp, True
         if pip is not None:
-            raw[6 + f], fresh[6 + f] = project_pip(pip, dip, p.ratio), True
+            raw[H.TENDON_SLOTS[f]], fresh[H.TENDON_SLOTS[f]] = project_pip(pip, dip, p.ratio), True
 
     out = []
     for i, v in enumerate(raw):

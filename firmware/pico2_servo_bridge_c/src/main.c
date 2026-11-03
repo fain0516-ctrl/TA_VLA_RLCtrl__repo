@@ -1,8 +1,8 @@
 // Pico 2 자작 보드 펌웨어 (C, Pico SDK): 지령(UDP) -> STS3215 버스 + DS3225 PWM, 상태 회신.
 // MicroPython 판(firmware/pico2_servo_bridge/main.py)과 같은 동작·같은 패킷입니다.
 //
-//   Pi/노트북 --UDP 5556--> W5500 --SPI0--> Pico 2 --UART0 1 Mbps--> ADuM1201 --> URT-2 --> STS3215 x6
-//                                                  --PWM 50 Hz--> SN74HCT125N ---------------> DS3225 x4
+//   Pi/노트북 --UDP 5556--> W5500 --SPI0--> Pico 2 --UART0 1 Mbps--> ADuM1201 --> URT-2 --> STS3215 x5
+//                                                  --PWM 50 Hz--> SN74HCT125N ---------------> DS3225 x5
 //   Pi/노트북 <--UDP 5555-- (지령 1개당 상태 1개)
 // 상태 메시지는 USB 시리얼(115200 아무 값이나)로 1 초마다 출력합니다.
 #include <stdio.h>
@@ -18,6 +18,8 @@
 #include "pico/unique_id.h"
 #include "sts.h"
 #include "w5500.h"
+
+_Static_assert(STS_N == LINK_N_STS && PWM_N == LINK_N_PWM, "config.h 서보 수가 패킷(link.h)과 다릅니다");
 
 static const uint8_t ids[STS_N] = STS_IDS;
 static const uint pwm_pins[PWM_N] = PWM_PINS;

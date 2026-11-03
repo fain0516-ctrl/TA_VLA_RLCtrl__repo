@@ -3,8 +3,8 @@
 """/servo_bus_node: 서보 지령을 시뮬레이션 또는 실제 버스로 보내고 측정값을 발행합니다.
 
 backend:=sim       서보 1차 지연 모델 (하드웨어 없이 파이프라인 검증)
-backend:=pico      Pico 2 자작 보드 (W5500 UDP). 보드가 STS3215 x6 와 DS3225 x4 를 구동  ← 실기 기본값
-backend:=hardware  Pi 직결: STS3215 x6 (/dev/ttyUSB0, 1 Mbps) + DS3225 x4 (PCA9685, /dev/i2c-1)
+backend:=pico      Pico 2 자작 보드 (W5500 UDP). 보드가 STS3215 x5 와 DS3225 x5 를 구동  ← 실기 기본값
+backend:=hardware  Pi 직결: STS3215 x5 (/dev/ttyUSB0, 1 Mbps) + DS3225 x5 (PCA9685, /dev/i2c-1)
 
 구독  /control/actuator_commands   std_msgs/Float32MultiArray [11]  servo_cmd[10] + torque_enabled
 발행  /hardware/servo_positions    std_msgs/Float32MultiArray [10]  rad (텐던 서보는 지령 에코)
@@ -34,18 +34,18 @@ class ServoBusNode(Node):
         d("pico.cmd_port", 5556)
         d("pico.state_port", 5555)
         d("sts.port", "/dev/ttyUSB0")
-        d("sts.ids", [1, 2, 3, 4, 5, 6])              # [인터페이스 문서] IF-02 모터 ID 1~10
-        d("sts.zero_raw", [2048] * 6)
-        d("sts.direction", [1] * 6)
+        d("sts.ids", [1, 2, 3, 4, 5])                 # 엄지~새끼 뿌리 관절 [확인 필요: 실제 ID]
+        d("sts.zero_raw", [2048] * H.N_STS)
+        d("sts.direction", [1] * H.N_STS)
         d("pca.bus", 1)
         d("pca.address", 0x40)
         d("pca.freq_hz", 50.0)
-        d("pca.channels", [0, 1, 2, 3])
+        d("pca.channels", [0, 1, 2, 3, 4])
         d("pca.min_us", 500.0)
         d("pca.max_us", 2500.0)
         d("pca.range_rad", 4.712389)
-        d("pca.zero_rad", [0.0] * 4)
-        d("pca.direction", [1] * 4)
+        d("pca.zero_rad", [0.0] * H.N_TENDON)
+        d("pca.direction", [1] * H.N_TENDON)
         for k, v in vars(TendonParams()).items():
             d(f"tendon.{k}", v)
         g = lambda n: self.get_parameter(n).value
@@ -81,7 +81,8 @@ class ServoBusNode(Node):
         pos, load = self.bk.read()
         self.pub_pos.publish(Float32MultiArray(data=[float(v) for v in pos]))
         self.pub_load.publish(Float32MultiArray(data=[float(v) for v in load]))
-        act = list(pos[:6]) + [pip_from_servo_angle(pos[6 + k], pos[2 + k], self.tp) for k in range(4)]
+        act = list(pos[:H.N_STS]) + [pip_from_servo_angle(pos[H.TENDON_SLOTS[f]], pos[H.STS_SLOTS[f]], self.tp, thumb=(f == 0))
+                                     for f in range(H.N_TENDON)]
         js = JointState()
         js.header.stamp = self.get_clock().now().to_msg()
         js.name = list(H.JOINT_NAMES)
