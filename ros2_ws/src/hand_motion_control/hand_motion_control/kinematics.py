@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+"""순기구학과 텐던 길이 모델.
+
+- 손끝 위치: [기구학 문서] 2.3 폐형태 수식 (MCP 원점, 굴곡 평면 X-Z). 마디 길이는 [2조 보고서] 손가락별 값.
+- 텐던 길이 L(θ): 3조 보고서의 "Pin joint 에서 원하는 굽힘각(θ)일 때 조절해야 할 Tendon 의 길이(L)".
+  여기서는 관절마다 유효 권선 반경이 일정한 모델 L = r_MCP·θ_MCP + r_PIP·θ_PIP + r_DIP·θ_DIP 를 씁니다.
+  엄지는 관절이 둘이라 L = r_MCP·θ_0-0 + r_PIP·θ_0-1 (반경은 4지와 같은 [추정] 값).
+  MCP 항은 [AI_Priority_Rules/10] 2.1 Kinematic Decoupler (ΔL = r_mcp·Δq_mcp) 와 같습니다.
+  3조가 논문에서 유도한 수식이 확정되면 tendon_length() 만 바꾸면 됩니다.
+- 반경 기본값은 레포 v8/config.py 의 [추정] 값(R_MCP 8 mm, R_PIP 7 mm, R_DIP 5 mm, 스풀 8 mm)과 같습니다.
+"""
+import math
+from dataclasses import dataclass
+
+from . import hand_spec as H
+
+
+@dataclass
+class TendonParams:
+    r_mcp: float = 0.0080     # m/rad [추정]
+    r_pip: float = 0.0070     # m/rad [추정]
+    r_dip: float = 0.0050     # m/rad [추정]
+    r_pulley: float = 0.0080  # 서보 horn(Reel) 반경 m [추정]
+    ratio: float = H.DIP_PIP_RATIO
+
+
+def finger_tip(q_mcp, q_pip, finger="index", ratio=H.DIP_PIP_RATIO):
+    """검지~새끼 손끝 (x, z) m. [기구학 문서] 2.2~2.3, finger 는 "index" | "middle" | "ring" | "pinky"."""
+    l1, l2, l3 = H.FINGER_LINKS[finger]
+    p0 = q_mcp
+    p1 = q_mcp + q_pip
+    p2 = q_mcp + (1.0 + ratio) * q_pip
+    x = l1 * math.cos(p0) + l2 * math.cos(p1) + l3 * math.cos(p2)
+    z = l1 * math.sin(p0) + l2 * math.sin(p1) + l3 * math.sin(p2)
+    return x, z
+
+
+def thumb_tip_local(q0, q1):
+    """엄지 국소 평면 손끝 (x, z) m. [기구학 문서] 5."""
+    l1, l2 = H.THUMB_LINKS
+    x = l1 * math.cos(q0) + l2 * math.cos(q0 + q1)
+    z = l1 * math.sin(q0) + l2 * math.sin(q0 + q1)
+    return x, z
+
+
+def _pip_arm(p: TendonParams, thumb=False):
+    """둘째 관절 1 rad 당 텐던 길이. 엄지는 셋째 관절이 없어 DIP 항이 없습니다."""
+    return p.r_pip if thumb else p.r_pip + p.ratio * p.r_dip
+
+
+def tendon_length(q_mcp, q_pip, p: TendonParams, thumb=False):
+    """완전히 편 자세 기준 텐던 감김 길이 L (m). 엄지는 q_pip = 0-1 관절각."""
+    return p.r_mcp * q_mcp + _pip_arm(p, thumb) * q_pip
+
+
+def tendon_servo_angle(q_mcp, q_pip, p: TendonParams, thumb=False):
+    """목표 (뿌리 관절, 둘째 관절) 를 만들기 위한 텐던 서보 horn 회전각 (rad)."""
+    return tendon_length(q_mcp, q_pip, p, thumb) / p.r_pulley
+
+
+def pip_from_servo_angle(servo_angle, q_mcp, p: TendonParams, thumb=False):
+    """tendon_servo_angle 의 역함수 (시뮬레이션·피드백 추정용)."""
+    return (servo_angle * p.r_pulley - p.r_mcp * q_mcp) / _pip_arm(p, thumb)
