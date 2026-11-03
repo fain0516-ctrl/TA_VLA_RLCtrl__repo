@@ -7,7 +7,7 @@ import pytest
 from hand_motion_control import hand_spec as H
 from hand_motion_control import sts_protocol as S
 from hand_motion_control.controller import ControllerParams, LowLevelController
-from hand_motion_control.kinematics import (TendonParams, finger_tip, pip_from_servo_angle,
+from hand_motion_control.kinematics import (TendonParams, finger_tip, pip_from_servo_angle, thumb_tip_local,
                                             tendon_servo_angle)
 from hand_motion_control.mapping import MappingParams, map_human_to_robot, project_pip
 from hand_motion_control.pca9685 import ServoPulse, prescale_for, us_to_ticks
@@ -21,8 +21,12 @@ def test_spec_sizes_and_coupling():
 
 
 def test_fk_straight_finger_length():
-    x, z = finger_tip(0.0, 0.0)
-    assert x == pytest.approx(H.L_PROX + H.L_MID + H.L_DIST) and z == pytest.approx(0.0)
+    # 편 손가락 길이 = 2조 보고서 기준 총길이 (소지는 보고서 반올림 0.1 mm 차)
+    for f, total in (("index", 0.1424), ("middle", 0.1600), ("ring", 0.1536), ("pinky", 0.1216)):
+        x, z = finger_tip(0.0, 0.0, f)
+        assert x == pytest.approx(total, abs=2e-4) and z == pytest.approx(0.0)
+    x, z = thumb_tip_local(0.0, 0.0)
+    assert x == pytest.approx(0.1024)
 
 
 def test_tendon_roundtrip_and_mcp_decoupling():

@@ -109,7 +109,8 @@ python -m pytest ros2_ws -q     # 19개
 | mock data 로 개별 개발 후 D435i 검증 | `mock_hand_perception_node` | 1조 중간보고서 1·3절 |
 | FSR-402, 분압 1 kΩ/10 kΩ, Arduino Uno, V → N, 2차 다항식 | `fsr.py`, `tactile_serial_bridge_node` | 4조 중간보고서 1.1 |
 | 접촉 감지, 미끄러짐 감지, ROS2 통합 | `/tactile/*`, 미끄러짐 반사 | 4조 중간보고서 2.1~2.3 |
-| 링크 길이, θ_DIP = 0.8·θ_PIP, 0 ≤ θ ≤ π/2 | `hand_spec.py` | robotic_hand_ws/kinematics_dynamics_math_model.md, dh_parameters_report.md |
+| 손가락별 마디 길이, 손바닥 외형, 손가락 배치 각도(엄지 50°, 약지·소지 8°) | `hand_spec.py` | 2조 중간보고서 (2026-10-01) 2·3절 |
+| θ_DIP = 0.8·θ_PIP, 0 ≤ θ ≤ π/2, 손끝 수식 | `hand_spec.py`, `kinematics.py` | robotic_hand_ws/kinematics_dynamics_math_model.md, dh_parameters_report.md |
 | 100 Hz, 워치독 100 ms, 모터 ID 1~10, 1 Mbps | `controller.py`, `hand_params.yaml` | robotic_hand_ws/SYSTEM_INTERFACE_CONTRACT.md (IF-02, IF-04, IF-05B) |
 | Tactile Latch 0.15 N + 1.4°, 해제 시퀀스, ΔL = r_mcp·Δq_mcp, PCA9685 | `controller.py`, `kinematics.py`, `pca9685.py` | AI_Priority_Rules/10_SYSTEM_PIPELINE_ARCHITECTURE.md |
 | STS3215 레지스터 40/42/56/58/60 | `sts_protocol.py`, `firmware/.../sts.py` | URT2_STS3215_RASPI_GUIDE.md |
@@ -120,7 +121,7 @@ python -m pytest ros2_ws -q     # 19개
 
 1. **1조**: JointState 관절 이름(기본값 위 표), 엄지 관절을 `thumb_mcp/thumb_ip` 로 줄지, 사람 손 → 로봇 손 `gain/offset`.
 2. **4조**: Arduino 시리얼 한 줄 형식(제안: `a0,a1,a2,a3,a4`), 2차 다항식 계수(`fsr.poly`), 접촉 임계값, 미끄러짐 판단 기준. 지금 값은 모두 [추정].
-3. **2조(기구)**: DIP/PIP 비율 — 기구학 문서 0.8, 레포 `v8/config.py` 0.88 로 서로 다름. 텐던 권선 반경 `r_mcp, r_pip, r_dip`, horn 반경.
+3. **2조(기구)**: DIP/PIP 비율 — 기구학 문서 0.8, 레포 `v8/config.py` 0.88 로 서로 다름. 텐던 권선 반경 `r_mcp, r_pip, r_dip`, horn 반경 (2조 보고서에 없음). 마디 길이가 관절 축 간 거리인지. 약지·소지 8° 의 회전 방향. 2조 보고서는 손바닥 모터 5개(손가락마다 뿌리 관절 1개)·나머지 관절 와이어 구동이라, 엄지 STS3215 2개(3조 보고서)와 다름.
 4. **3조 실측**: STS3215 영점(`zero_raw`)·방향, DS3225 펄스 범위·회전 범위(현재 500~2500 µs / 270° [추정]).
 5. **Pico 2 보드**: W5500 SPI·UART·PWM 핀 번호 (`firmware/pico2_servo_bridge/config.py` 의 [확인 필요]). 받은 부품표(BOM)에는 핀 연결 정보가 없어 회로도가 필요합니다. IP 는 정해서 쓰는 값이며 방법은 펌웨어 README 의 "IP 설정과 확인".
 6. **모터 ID**: 인터페이스 문서는 1~10, AI_Priority_Rules/10 배선도는 0~5. 기본값은 1~6 이며 `sts.ids` 로 바꿉니다.

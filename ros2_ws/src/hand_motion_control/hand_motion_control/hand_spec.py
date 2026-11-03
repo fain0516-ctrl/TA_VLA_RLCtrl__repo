@@ -5,6 +5,7 @@
 - [3조 보고서] 3조 중간보고서 (2026-09-26)
 - [기구학 문서] robotic_hand_ws/kinematics_dynamics_math_model.md, dh_parameters_report.md
 - [인터페이스 문서] robotic_hand_ws/ROS2_PIPELINE_ARCHITECTURE.md, SYSTEM_INTERFACE_CONTRACT.md
+- [2조 보고서] 2조 와이어 구동 로봇 손 실험 중간보고서 (2026-10-01): 손가락·손바닥 CAD 제원 (기구 제작 담당)
 - [추정] 실측 전 임시값. config/hand_params.yaml 에서 덮어씁니다.
 
 구동 구조 [3조 보고서]
@@ -37,9 +38,28 @@ N_ACTUATORS = len(ACTUATOR_NAMES)  # 10
 STS_SLOTS = tuple(range(0, 6))
 TENDON_SLOTS = tuple(range(6, 10))
 
-# 링크 길이 m [기구학 문서 1.2]
-L_PROX, L_MID, L_DIST = 0.040, 0.0158, 0.0155
-L_T1, L_T2 = 0.045, 0.035
+# 손가락 마디 길이 m [2조 보고서 2. 손가락 주요 제원] (첫째 마디, 둘째 마디, 끝마디)
+# 기구는 2조가 만들므로 2조 CAD 값을 씁니다. 표에 단위 표기가 없어 같은 보고서의 손바닥 표(mm)와 같은 mm 로 읽었습니다.
+# 마디 부품 길이이므로, 관절 축 사이 거리와 다르면 CAD 실측값으로 바꿔야 합니다 [확인 필요].
+# (이전 값: 기구학 문서 1.2 의 0.040 / 0.0158 / 0.0155, 엄지 0.045 / 0.035)
+FINGER_LINKS = {
+    "index":  (0.0698, 0.0384, 0.0342),   # 기준 총길이 142.4 mm
+    "middle": (0.0768, 0.0464, 0.0368),   # 160.0 mm
+    "ring":   (0.0722, 0.0445, 0.0369),   # 153.6 mm
+    "pinky":  (0.0559, 0.0316, 0.0340),   # 121.6 mm (보고서 표기, 세 마디 합은 121.5)
+}
+THUMB_LINKS = (0.0553, 0.0471)            # 엄지 2 마디, 102.4 mm
+
+# 손바닥 [2조 보고서 3. 손바닥 주요 제원]
+PALM_SIZE = (0.2263, 0.1564, 0.0600)      # 폭 x 길이 x 두께 m (약)
+# 손바닥 평면상 손가락 배치 각도 rad: 엄지 50°, 약지·소지 각 8°. 회전 방향(부호)은 보고서에 없음 [확인 필요]
+FINGER_YAW = {
+    "thumb": math.radians(50.0),
+    "index": 0.0,
+    "middle": 0.0,
+    "ring": math.radians(8.0),
+    "pinky": math.radians(8.0),
+}
 
 # 텐던 커플링 θ_DIP = κ·θ_PIP [기구학 문서 1.1, DH 문서 2.1]
 # (주의) 레포 v8/config.py 는 0.88 을 씁니다. 2팀 실측 후 한 값으로 맞춰야 합니다.
